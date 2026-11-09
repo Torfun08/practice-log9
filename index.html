@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>บันทึกการซ้อม</title>
+<style>
+  :root {
+    --bg: #eaf0ef;
+    --card: #ffffff;
+    --ink: #17252a;
+    --muted: #55696e;
+    --line: #cfdcda;
+    --accent: #0f5c5a;
+    --accent-ink: #ffffff;
+    --today: #e0a526;
+    --danger: #a3342a;
+    --radius: 16px;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Noto Sans Thai", "Sarabun", "Leelawadee UI", "Tahoma", system-ui, sans-serif;
+    font-size: 17px;
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+  main { max-width: 560px; margin: 0 auto; padding: 20px 16px 48px; }
+  h1 { font-size: 1.6rem; margin: 8px 0 2px; line-height: 1.3; }
+  h2 { font-size: 1.1rem; margin: 0 0 12px; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 18px;
+    margin-bottom: 16px;
+  }
+  label { display: block; font-weight: 600; margin-bottom: 4px; }
+  input, textarea {
+    width: 100%;
+    font: inherit;
+    color: inherit;
+    padding: 12px 14px;
+    min-height: 48px;
+    border: 1.5px solid var(--line);
+    border-radius: 12px;
+    background: #fff;
+  }
+  textarea { resize: vertical; min-height: 84px; }
+  input:focus, textarea:focus, button:focus-visible {
+    outline: 3px solid var(--today);
+    outline-offset: 2px;
+  }
+  .field { margin-bottom: 14px; }
+
+  /* Timer */
+  .clock {
+    font-variant-numeric: tabular-nums;
+    font-size: clamp(3.2rem, 17vw, 4.6rem);
+    font-weight: 700;
+    text-align: center;
+    letter-spacing: 0.02em;
+    margin: 4px 0 4px;
+    line-height: 1.1;
+  }
+  .status { text-align: center; color: var(--muted); margin: 0 0 16px; min-height: 1.6em; }
+  .clock.running { color: var(--accent); }
+
+  .row { display: flex; gap: 10px; }
+  .row > * { flex: 1; }
+  button {
+    font: inherit;
+    font-weight: 600;
+    min-height: 52px;
+    padding: 0 16px;
+    border-radius: 12px;
+    border: 1.5px solid var(--accent);
+    background: #fff;
+    color: var(--accent);
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  button.primary { background: var(--accent); color: var(--accent-ink); }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button.small { min-height: 44px; padding: 0 12px; font-size: 0.9rem; }
+  button.danger { color: var(--danger); border-color: var(--danger); }
+
+  /* Summary */
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
+  .stat { background: var(--bg); border-radius: 12px; padding: 10px 6px; text-align: center; }
+  .stat b { display: block; font-size: 1.35rem; line-height: 1.3; font-variant-numeric: tabular-nums; }
+  .stat span { font-size: 0.85rem; color: var(--muted); }
+  svg { display: block; width: 100%; height: auto; }
+  .chart-note { color: var(--muted); font-size: 0.9rem; margin: 8px 0 0; }
+
+  /* History */
+  ul { list-style: none; padding: 0; margin: 0; }
+  li.entry {
+    display: flex; gap: 10px; align-items: flex-start;
+    padding: 12px 0; border-top: 1px solid var(--line);
+  }
+  li.entry:first-child { border-top: 0; padding-top: 0; }
+  .entry .info { flex: 1; min-width: 0; }
+  .entry .title { font-weight: 600; overflow-wrap: anywhere; }
+  .entry .meta { color: var(--muted); font-size: 0.88rem; }
+  .entry .note { margin-top: 2px; overflow-wrap: anywhere; white-space: pre-wrap; }
+  .empty { color: var(--muted); text-align: center; padding: 8px 0; }
+  .toast {
+    position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%);
+    background: var(--ink); color: #fff; padding: 12px 18px; border-radius: 999px;
+    max-width: calc(100vw - 32px); opacity: 0; pointer-events: none;
+    transition: opacity .2s;
+  }
+  .toast.show { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>บันทึกการซ้อม</h1>
+  <p class="sub">จับเวลา จดบันทึก และดูสถิติการซ้อม 7 วันล่าสุด</p>
+
+  <section class="card" aria-labelledby="t-head">
+    <h2 id="t-head">จับเวลาซ้อม</h2>
+    <div class="field">
+      <label for="piece">ซ้อมอะไรอยู่</label>
+      <input id="piece" type="text" maxlength="80" placeholder="เช่น สเกล C เมเจอร์ หรือ เพลงที่ 2" autocomplete="off">
+    </div>
+    <div id="clock" class="clock" role="timer" aria-live="off">00:00</div>
+    <p id="status" class="status">กดเริ่มเมื่อพร้อมซ้อม</p>
+    <div class="row" style="margin-bottom:14px">
+      <button id="toggle" class="primary" type="button">เริ่มซ้อม</button>
+      <button id="reset" type="button" disabled>เริ่มใหม่</button>
+    </div>
+    <div class="field">
+      <label for="note">บันทึกหลังซ้อม</label>
+      <textarea id="note" maxlength="500" placeholder="วันนี้ติดตรงไหน อะไรดีขึ้น"></textarea>
+    </div>
+    <button id="save" class="primary" type="button" style="width:100%" disabled>บันทึกการซ้อม</button>
+  </section>
+
+  <section class="card" aria-labelledby="m-head">
+    <h2 id="m-head">เพิ่มเวลาที่ซ้อมไปแล้ว</h2>
+    <div class="row" style="align-items:flex-end">
+      <div>
+        <label for="manual">จำนวนนาที</label>
+        <input id="manual" type="number" inputmode="numeric" min="1" max="600" placeholder="เช่น 20">
+      </div>
+      <button id="addManual" type="button">เพิ่ม</button>
+    </div>
+  </section>
+
+  <section class="card" aria-labelledby="c-head">
+    <h2 id="c-head">7 วันล่าสุด</h2>
+    <div class="stats">
+      <div class="stat"><b id="sToday">0</b><span>นาทีวันนี้</span></div>
+      <div class="stat"><b id="sWeek">0</b><span>นาทีใน 7 วัน</span></div>
+      <div class="stat"><b id="sStreak">0</b><span>วันติดต่อกัน</span></div>
+    </div>
+    <svg id="chart" viewBox="0 0 320 170" role="img" aria-label="กราฟนาทีที่ซ้อมในแต่ละวัน"></svg>
+    <p class="chart-note">แท่งสีเหลืองคือวันนี้</p>
+  </section>
+
+  <section class="card" aria-labelledby="h-head">
+    <h2 id="h-head">ประวัติการซ้อม</h2>
+    <ul id="history"></ul>
+  </section>
+</main>
+<div id="toast" class="toast" role="status"></div>
+
+<script>
+(function () {
+  var LOG_KEY = "practicelog.entries.v1";
+  var TIMER_KEY = "practicelog.timer.v1";
+  var DAYS = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
+
+  var $ = function (id) { return document.getElementById(id); };
+  var els = {
+    piece: $("piece"), clock: $("clock"), status: $("status"),
+    toggle: $("toggle"), reset: $("reset"), note: $("note"), save: $("save"),
+    manual: $("manual"), addManual: $("addManual"),
+    sToday: $("sToday"), sWeek: $("sWeek"), sStreak: $("sStreak"),
+    chart: $("chart"), history: $("history"), toast: $("toast")
+  };
+
+  /* ---------- storage (safe) ---------- */
+  function load(key, fallback) {
+    try {
+      var raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : fallback;
+    } catch (e) { return fallback; }
+  }
+  function store(key, value) {
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
+  }
+
+  var entries = load(LOG_KEY, []);
+  if (!Array.isArray(entries)) entries = [];
+  var timer = load(TIMER_KEY, { startedAt: null, acc: 0 });
+
+  /* ---------- helpers ---------- */
+  function pad(n) { return n < 10 ? "0" + n : "" + n; }
+  function fmt(sec) {
+    var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+    return (h ? h + ":" + pad(m) : pad(m)) + ":" + pad(s);
+  }
+  function dayKey(ts) {
+    var d = new Date(ts);
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  }
+  function minutes(sec) { return Math.round(sec / 60); }
+  function elapsed() {
+    var extra = timer.startedAt ? Math.floor((Date.now() - timer.startedAt) / 1000) : 0;
+    return timer.acc + extra;
+  }
+  var toastTimer;
+  function toast(msg) {
+    els.toast.textContent = msg;
+    els.toast.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { els.toast.classList.remove("show"); }, 2200);
+  }
+
+  /* ---------- timer ---------- */
+  function renderTimer() {
+    var sec = elapsed();
+    var running = !!timer.startedAt;
+    els.clock.textContent = fmt(sec);
+    els.clock.classList.toggle("running", running);
+    els.toggle.textContent = running ? "พัก" : (sec > 0 ? "ซ้อมต่อ" : "เริ่มซ้อม");
+    els.status.textContent = running ? "กำลังซ้อม… ตั้งใจเข้าไว้"
+      : sec > 0 ? "พักอยู่ กดซ้อมต่อ หรือบันทึกได้เลย"
+      : "กดเริ่มเมื่อพร้อมซ้อม";
+    els.reset.disabled = sec === 0 && !running;
+    els.save.disabled = sec < 1;
+  }
+
+  els.toggle.addEventListener("click", function () {
+    if (timer.startedAt) {
+      timer.acc = elapsed();
+      timer.startedAt = null;
+    } else {
+      timer.startedAt = Date.now();
+    }
+    store(TIMER_KEY, timer);
+    renderTimer();
+  });
+
+  els.reset.addEventListener("click", function () {
+    if (elapsed() >= 60 && !confirm("เริ่มจับเวลาใหม่? เวลาที่นับไว้จะหายไป")) return;
+    timer = { startedAt: null, acc: 0 };
+    store(TIMER_KEY, timer);
+    renderTimer();
+  });
+
+  setInterval(function () { if (timer.startedAt) renderTimer(); }, 500);
+  document.addEventListener("visibilitychange", renderTimer);
+
+  /* ---------- saving ---------- */
+  function addEntry(sec, piece, note) {
+    entries.push({
+      id: Date.now() + "-" + Math.floor(Math.random() * 1000),
+      ts: Date.now(),
+      sec: sec,
+      piece: piece,
+      note: note
+    });
+    store(LOG_KEY, entries);
+    renderAll();
+  }
+
+  els.save.addEventListener("click", function () {
+    var sec = elapsed();
+    if (sec < 1) return;
+    addEntry(sec, els.piece.value.trim(), els.note.value.trim());
+    timer = { startedAt: null, acc: 0 };
+    store(TIMER_KEY, timer);
+    els.note.value = "";
+    renderTimer();
+    toast("บันทึกแล้ว " + fmt(sec));
+  });
+
+  els.addManual.addEventListener("click", function () {
+    var m = parseInt(els.manual.value, 10);
+    if (!m || m < 1 || m > 600) {
+      toast("ใส่จำนวนนาทีระหว่าง 1 ถึง 600");
+      els.manual.focus();
+      return;
+    }
+    addEntry(m * 60, els.piece.value.trim(), "");
+    els.manual.value = "";
+    toast("เพิ่ม " + m + " นาทีแล้ว");
+  });
+
+  /* ---------- stats + chart ---------- */
+  function lastSevenDays() {
+    var out = [], now = new Date();
+    for (var i = 6; i >= 0; i--) {
+      var d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+      out.push({ key: dayKey(d.getTime()), label: DAYS[d.getDay()], sec: 0, today: i === 0 });
+    }
+    return out;
+  }
+
+  function renderStats() {
+    var days = lastSevenDays();
+    var byKey = {};
+    days.forEach(function (d) { byKey[d.key] = d; });
+    var allByDay = {};
+    entries.forEach(function (e) {
+      var k = dayKey(e.ts);
+      allByDay[k] = (allByDay[k] || 0) + e.sec;
+      if (byKey[k]) byKey[k].sec += e.sec;
+    });
+
+    var week = days.reduce(function (a, d) { return a + d.sec; }, 0);
+    els.sToday.textContent = minutes(days[6].sec);
+    els.sWeek.textContent = minutes(week);
+
+    // streak: consecutive days with practice, ending today (or yesterday if not yet today)
+    var streak = 0, cursor = new Date();
+    if (!allByDay[dayKey(cursor.getTime())]) cursor.setDate(cursor.getDate() - 1);
+    while (allByDay[dayKey(cursor.getTime())]) {
+      streak++;
+      cursor.setDate(cursor.getDate() - 1);
+    }
+    els.sStreak.textContent = streak;
+
+    drawChart(days);
+  }
+
+  function drawChart(days) {
+    var W = 320, H = 170, top = 22, bottom = 28, barW = 28;
+    var plotH = H - top - bottom;
+    var maxMin = Math.max(30, Math.max.apply(null, days.map(function (d) { return minutes(d.sec); })));
+    var gap = (W - barW * 7) / 8;
+    var svg = "";
+    svg += '<line x1="0" y1="' + (H - bottom) + '" x2="' + W + '" y2="' + (H - bottom) + '" stroke="#cfdcda" stroke-width="1.5"/>';
+    days.forEach(function (d, i) {
+      var m = minutes(d.sec);
+      var h = Math.round((m / maxMin) * plotH);
+      if (m > 0 && h < 4) h = 4;
+      var x = gap + i * (barW + gap);
+      var y = H - bottom - h;
+      var fill = d.today ? "#e0a526" : "#0f5c5a";
+      if (h > 0) svg += '<rect x="' + x + '" y="' + y + '" width="' + barW + '" height="' + h + '" rx="5" fill="' + fill + '"/>';
+      svg += '<text x="' + (x + barW / 2) + '" y="' + (h > 0 ? y - 5 : H - bottom - 5) + '" text-anchor="middle" font-size="12" font-weight="600" fill="#17252a">' + (m > 0 ? m : "") + '</text>';
+      svg += '<text x="' + (x + barW / 2) + '" y="' + (H - 8) + '" text-anchor="middle" font-size="13" fill="#55696e"' + (d.today ? ' font-weight="700"' : '') + '>' + d.label + '</text>';
+    });
+    els.chart.innerHTML = svg;
+  }
+
+  /* ---------- history ---------- */
+  function renderHistory() {
+    els.history.innerHTML = "";
+    if (!entries.length) {
+      var li = document.createElement("li");
+      li.className = "empty";
+      li.textContent = "ยังไม่มีบันทึก เริ่มจับเวลาซ้อมครั้งแรกได้เลย";
+      els.history.appendChild(li);
+      return;
+    }
+    entries.slice().sort(function (a, b) { return b.ts - a.ts; }).slice(0, 30).forEach(function (e) {
+      var li = document.createElement("li");
+      li.className = "entry";
+
+      var info = document.createElement("div");
+      info.className = "info";
+      var t = document.createElement("div");
+      t.className = "title";
+      t.textContent = e.piece || "ซ้อมทั่วไป";
+      var meta = document.createElement("div");
+      meta.className = "meta";
+      var d = new Date(e.ts);
+      meta.textContent = minutes(e.sec) + " นาที · " + d.getDate() + "/" + (d.getMonth() + 1) + " " + pad(d.getHours()) + ":" + pad(d.getMinutes());
+      info.appendChild(t);
+      info.appendChild(meta);
+      if (e.note) {
+        var n = document.createElement("div");
+        n.className = "note";
+        n.textContent = e.note;
+        info.appendChild(n);
+      }
+
+      var del = document.createElement("button");
+      del.type = "button";
+      del.className = "small danger";
+      del.textContent = "ลบ";
+      del.setAttribute("aria-label", "ลบบันทึก " + (e.piece || "ซ้อมทั่วไป"));
+      del.addEventListener("click", function () {
+        if (!confirm("ลบบันทึกนี้?")) return;
+        entries = entries.filter(function (x) { return x.id !== e.id; });
+        store(LOG_KEY, entries);
+        renderAll();
+        toast("ลบแล้ว");
+      });
+
+      li.appendChild(info);
+      li.appendChild(del);
+      els.history.appendChild(li);
+    });
+  }
+
+  function renderAll() { renderStats(); renderHistory(); }
+
+  renderTimer();
+  renderAll();
+})();
+</script>
+</body>
+</html>
